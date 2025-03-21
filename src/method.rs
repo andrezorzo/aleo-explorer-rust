@@ -55,6 +55,7 @@ use snarkvm_ledger_puzzle::{PuzzleTrait, SolutionID};
 use snarkvm_ledger_puzzle_epoch::SynthesisPuzzle;
 use snarkvm_synthesizer_program::Program;
 use snarkvm_utilities::{ToBits as UToBits, Uniform};
+use rayon::prelude::*;
 
 use crate::{RustExecuteError, class::*};
 
@@ -727,4 +728,22 @@ pub fn batch_signature_to_address(py: Python, signatures: Vec<String>) -> PyResu
     }
     
     Ok(results)
+}
+
+#[pyfunction]
+pub fn parallel_signature_to_address(py: Python, signatures: Vec<String>) -> PyResult<Vec<String>> {
+    // Release the GIL to allow other Python threads to run
+    py.allow_threads(|| {
+        // Process signatures in parallel using Rayon
+        signatures.par_iter()
+            .map(|signature| {
+                // Convert each signature to an address
+                let signature_obj = Signature::<N>::from_str(signature)
+                    .map_err(|_| format!("invalid signature: {}", signature))?;
+                let address = signature_obj.to_address().to_string();
+                Ok(address)
+            })
+            .collect::<Result<Vec<String>, String>>()
+            .map_err(|e| exceptions::PyValueError::new_err(e))
+    })
 }
