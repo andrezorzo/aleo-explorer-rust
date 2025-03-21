@@ -710,3 +710,21 @@ pub fn get_puzzle_program_data(py: Python, epoch_hash: &[u8]) -> PyResult<PyObje
     ];
     Ok(PyTuple::new_bound(py, tuple).into())
 }
+
+#[pyfunction]
+pub fn batch_signature_to_address(py: Python, signatures: Vec<String>) -> PyResult<Vec<String>> {
+    let mut results = Vec::with_capacity(signatures.len());
+    
+    for signature in signatures {
+        // Process each signature
+        let signature_obj = Signature::<N>::from_str(&signature)
+            .map_err(|_| exceptions::PyValueError::new_err(format!("invalid signature: {}", signature)))?;
+        let address = signature_obj.to_address().to_string();
+        results.push(address);
+        
+        // Allow other Python threads to run during long operations
+        py.check_signals()?;
+    }
+    
+    Ok(results)
+}
